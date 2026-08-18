@@ -4,13 +4,28 @@ import json
 import re
 import urllib3
 import concurrent.futures
-from flask import Flask, render_template, jsonify, make_response
+from flask import Flask, render_template, jsonify, make_response, request
 from datetime import datetime, timezone, timedelta
 
 # Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
+
+
+@app.errorhandler(404)
+def debug_404(e):
+    return jsonify({
+        "path": request.path,
+        "full_path": request.full_path,
+        "script_root": request.script_root,
+        "environ_PATH_INFO": request.environ.get("PATH_INFO"),
+        "environ_SCRIPT_NAME": request.environ.get("SCRIPT_NAME"),
+        "url": request.url,
+        "base_url": request.base_url,
+        "url_rule": str(request.url_rule),
+        "registered_rules": [str(r) for r in app.url_map.iter_rules()],
+    }), 404
 
 # --- CONFIGURATION ---
 MAIN_AIRPORTS = [
