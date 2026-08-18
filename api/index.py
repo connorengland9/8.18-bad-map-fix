@@ -65,6 +65,23 @@ def metar_body(raw_text):
     return re.split(r'\bRMK\b', raw_text.upper())[0]
 
 
+# A weather-phenomena group is built entirely from these 2-letter codes,
+# optionally prefixed with intensity (+/-) or VC, and one descriptor --
+# e.g. "+TSGR" (heavy thunderstorm hail). Matching the whole token against
+# this grammar (rather than scanning raw text for bare substrings) is what
+# keeps a station ID like "PGRO" from being mistaken for hail ("GR").
+_WX_DESCRIPTORS = "MI|PR|BC|DR|BL|SH|TS|FZ"
+_WX_PHENOMENA = "DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS"
+WX_TOKEN_RE = re.compile(rf'^(?:[-+]|VC)?(?:{_WX_DESCRIPTORS})?(?:{_WX_PHENOMENA})+$')
+
+
+def extract_wx_tokens(raw_text):
+    """Pull only genuine weather-phenomena groups out of a raw METAR body,
+    ignoring the station ID / wind / cloud groups that can coincidentally
+    contain the same 2-letter codes."""
+    return " ".join(t for t in metar_body(raw_text).split() if WX_TOKEN_RE.match(t))
+
+
 def check_pirep_condition(station_data):
     conditions = []
 
@@ -99,7 +116,7 @@ def check_pirep_condition(station_data):
     # line raised TypeError, which 500'd the entire /api/data route.
     wx = (station_data.get('wxString') or "").upper()
     if not wx:
-        wx = metar_body(station_data.get('rawOb') or "")
+        wx = extract_wx_tokens(station_data.get('rawOb') or "")
 
     if 'TS' in wx: conditions.append("THUNDERSTORM")
     if 'VA' in wx: conditions.append("VOLCANIC ASH")
